@@ -37,17 +37,7 @@ def main():
         )
     logger.info("Starting development server...")
     subprocess.run(
-        [
-            "uv",
-            "run",
-            "uvicorn",
-            "gomoku.main:app",
-            "--reload",
-            "--host",
-            "0.0.0.0",
-            "--log-config",
-            str(ROOT_DIR / "log_config.json"),
-        ],
+        ["uv", "run", "uvicorn", "gomoku.main:app", "--reload", "--host", "0.0.0.0"],
         cwd=ROOT_DIR / "src",
     )
 
