@@ -2,15 +2,15 @@
 import os
 from typing import AsyncGenerator
 
+from sqlalchemy import text
+from sqlalchemy.engine import URL
 from sqlalchemy.ext.asyncio import (
-    create_async_engine,
     AsyncConnection,
     async_sessionmaker,
+    create_async_engine,
 )
-from sqlalchemy.engine import URL
-from sqlalchemy import text
 
-from env import ENV, SQL_USER, SQL_PASSWORD, SQL_HOST, SQL_PORT, SQL_DATABASE
+from gomoku.env import ENV, SQL_DATABASE, SQL_HOST, SQL_PASSWORD, SQL_PORT, SQL_USER
 
 # 從環境變量獲取數據庫 URL，如果沒有則使用默認值
 # 格式: postgresql+asyncpg://user:password@host:port/dbname

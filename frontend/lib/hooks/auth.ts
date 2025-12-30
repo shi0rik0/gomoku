@@ -1,6 +1,4 @@
-// hooks/useAuth.ts
 import { useEffect, useState } from "react"
-import { useRouter } from "next/router"
 
 export type User = {
   id: string
@@ -21,20 +19,22 @@ const parseUserFromToken = (token: string | null): User | null => {
     )
     // 检查是否过期
     if (payload.exp && Date.now() >= payload.exp * 1000) {
+      console.log("Token 已过期")
       return null
     }
+    console.log("解析的用户:", payload)
     return {
       id: payload.sub || payload.id,
       name: payload.name,
       email: payload.email,
     }
   } catch (e) {
+    console.log("Token 解析失败:", e)
     return null
   }
 }
 
 export function useAuth() {
-  const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -42,14 +42,11 @@ export function useAuth() {
   const validateToken = () => {
     const token =
       typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null
+    console.log("当前 token:", token)
     const parsedUser = parseUserFromToken(token)
+    console.log("解析后的用户:", parsedUser)
     setUser(parsedUser)
     setLoading(false)
-
-    // 如果无效，跳转到登录页
-    if (!parsedUser) {
-      router.replace("/login")
-    }
   }
 
   useEffect(() => {
@@ -72,7 +69,6 @@ export function useAuth() {
         if (!currentUser && user) {
           // 从有效变为无效
           setUser(null)
-          router.replace("/login")
         } else if (currentUser && !user) {
           // 极少数情况：token 被恢复（如调试）
           setUser(currentUser)
@@ -86,23 +82,19 @@ export function useAuth() {
       window.removeEventListener("storage", handleStorageChange)
       clearInterval(interval)
     }
-  }, [router, user]) // 注意：依赖 user 是为了在登出后停止定时器
+  }, []) // 注意：依赖 user 是为了在登出后停止定时器
 
   // 登录：保存 token
   const login = (accessToken: string) => {
     localStorage.setItem(TOKEN_KEY, accessToken)
     const parsedUser = parseUserFromToken(accessToken)
     setUser(parsedUser)
-    if (parsedUser) {
-      router.push("/game") // 或你的默认页面
-    }
   }
 
   // 登出：清除 token
   const logout = () => {
     localStorage.removeItem(TOKEN_KEY)
     setUser(null)
-    router.push("/login")
   }
 
   // 获取当前 token（用于 API 请求）

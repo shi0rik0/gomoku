@@ -1,11 +1,16 @@
 """JWT认证相关的逻辑"""
 
-from jose import jwt, JWTError, ExpiredSignatureError
+import logging
 from datetime import datetime, timedelta, timezone
-from fastapi import Depends, HTTPException, status, Security
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, APIKeyQuery
 
-from env import JWT_SECRET, JWT_EXPIRE_MINUTES
+from fastapi import Depends, HTTPException, Security, status
+from fastapi.security import APIKeyQuery, HTTPAuthorizationCredentials, HTTPBearer
+from jose import ExpiredSignatureError, JWTError, jwt
+
+from gomoku.env import JWT_EXPIRE_MINUTES, JWT_SECRET
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 SECRET_KEY = JWT_SECRET
 ALGORITHM = "HS256"
@@ -17,7 +22,7 @@ security = HTTPBearer()  # 用于解析 Authorization: Bearer <token>
 def create_token(user_id: str) -> str:
     now = datetime.now(timezone.utc)
     expire = now + timedelta(minutes=JWT_EXPIRE_MINUTES)
-    payload = {"sub": user_id, "exp": expire}  # subject  # expiration
+    payload = {"sub": user_id, "exp": expire}
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
@@ -55,6 +60,7 @@ token_query = APIKeyQuery(name="token", auto_error=True)
 async def get_current_player_from_query(token: str = Security(token_query)) -> str:
     """从 query 参数验证 JWT Token"""
     player_id = verify_token(token)
+    logger.info(f"Verifying token from query: {token}, player_id: {player_id}")
     if player_id is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
