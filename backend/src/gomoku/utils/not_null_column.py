@@ -1,3 +1,5 @@
+"""NotNullColumn 是一个默认 nullable=False 的 SQLAlchemy Column 工厂函数，保留完整类型提示"""
+
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union, overload
 

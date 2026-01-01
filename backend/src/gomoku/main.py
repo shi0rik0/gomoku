@@ -21,7 +21,6 @@ from gomoku.state import (
     PlayerState,
     PlayerStatus,
     RoomState,
-    RoomStateManager,
     room_state_managers,
     room_state_managers_lock,
     server_state,
@@ -102,7 +101,7 @@ async def create_room(current_user: str = Depends(get_current_user)):
         )
     room_id = await room_id_manager.acquire_room_id()
     async with room_state_managers_lock:
-        room_state_managers[room_id] = RoomStateManager(
+        room_state_managers[room_id] = RoomState(
             RoomState(
                 id=room_id,
                 players=[current_user, None],

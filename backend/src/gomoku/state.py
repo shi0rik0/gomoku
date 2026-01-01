@@ -1,15 +1,13 @@
 """定义游戏服务器的状态"""
 
 import asyncio
+import logging
 from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable, Generic, Literal, TypeVar
 
-
-class PlayerStatus(str, Enum):
-    IN_ROOM = "in_room"
-    IN_GAME = "in_game"
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -17,9 +15,7 @@ class PlayerState:
     """玩家的状态"""
 
     id: str
-    name: str
-    status: PlayerStatus
-    lock: asyncio.Lock = asyncio.Lock()
+    status: Literal["in_room", "in_game"]
 
 
 @dataclass
@@ -44,42 +40,36 @@ S = TypeVar("S")  # State 类型
 E = TypeVar("E")  # Event/Message 类型
 
 
-class GeneralStateManager(Generic[S, E]):
+class SubscribableState(Generic[S, E]):
     """通用的游戏状态"""
 
     def __init__(self, data: S):
         self.data = data
         self.queues: dict[str, asyncio.Queue[E]] = {}
-        self.lock = asyncio.Lock()
 
-    async def subscribe(self, player_id: str) -> tuple[asyncio.Queue[E], S]:
-        """为玩家订阅消息队列"""
-        async with self.lock:
-            if player_id not in self.queues:
-                self.queues[player_id] = asyncio.Queue()
-            return self.queues[player_id], deepcopy(self.data)
+    def subscribe(self, queue_id: str) -> tuple[asyncio.Queue[E], S]:
+        """为玩家订阅消息队列
 
-    async def unsubscribe(self, player_id: str):
+        注意：返回的 self.data 不能直接修改，否则会影响到状态管理器中的数据"""
+        if queue_id not in self.queues:
+            self.queues[queue_id] = asyncio.Queue()
+        return self.queues[queue_id], self.data
+
+    def unsubscribe(self, queue_id: str):
         """取消玩家的消息队列订阅"""
-        async with self.lock:
-            if player_id in self.queues:
-                del self.queues[player_id]
+        if queue_id in self.queues:
+            del self.queues[queue_id]
+        else:
+            logger.warning(f"Queue ID {queue_id} not found during unsubscribe.")
 
-    async def update(self, reducer: Callable[[S], tuple[S, E]]):
+    def update(self, reducer: Callable[[S], tuple[S, E]]):
         """使用 reducer 函数更新状态并通知所有订阅者"""
-        async with self.lock:
-            data, msg = reducer(deepcopy(self.data))
-            self.data = deepcopy(data)
-            for queue in self.queues.values():
-                await queue.put(deepcopy(msg))
-
-
-# 因为 RoomState 比较小，所以没必要用事件进行增量更新
-# 这里直接用 RoomState 作为事件类型
-RoomStateManager = GeneralStateManager[RoomState, RoomState]
-
-room_state_managers_lock = asyncio.Lock()
-room_state_managers: dict[str, RoomStateManager] = {}
+        self.data, msg = reducer(self.data)
+        for qid, queue in self.queues.items():
+            try:
+                queue.put_nowait(msg)
+            except asyncio.QueueFull:
+                logger.warning(f"Queue {qid} is full. Skipping message.")
 
 
 @dataclass
@@ -94,12 +84,144 @@ class GameState:
 
 
 @dataclass
+class GameStateChange:
+    """游戏状态变更消息"""
+
+    game_id: str
+    board: list[list[int]]
+    current_turn: Literal["black", "white"]
+
+
+SubscribableRoomState = SubscribableState[RoomState, RoomState]
+SubscribableGameState = SubscribableState[GameState, GameStateChange]
+
+
 class ServerState:
-    """服务器的整体状态"""
+    def __init__(self):
+        self.player_state: dict[str, PlayerState] = {}
+        self.room_state: dict[str, SubscribableRoomState] = {}
+        self.game_state: dict[str, SubscribableGameState] = {}
 
-    rooms: dict[str, RoomState]
-    players: dict[str, PlayerState]
-    games: dict[str, GameState]
+    def player_create_room(self, player_id: str, room_id: str):
+        """玩家创建房间"""
+        room = RoomState(
+            id=room_id,
+            players=[player_id, None],
+            host=player_id,
+            ready=[False, False],
+        )
+        self.room_state[room_id] = SubscribableRoomState(room)
+        self.player_state[player_id].status = "in_room"
+
+    def player_join_room(self, player_id: str, room_id: str):
+        """玩家加入房间"""
+        room_state = self.room_state[room_id].data
+        for i in range(len(room_state.players)):
+            if room_state.players[i] is None:
+                room_state.players[i] = player_id
+                room_state.ready[i] = False
+                break
+        self.player_state[player_id].status = "in_room"
+
+    def player_leave_room(self, player_id: str, room_id: str):
+        """玩家离开房间"""
+        room_state = self.room_state[room_id].data
+        for i in range(len(room_state.players)):
+            if room_state.players[i] == player_id:
+                room_state.players[i] = None
+                room_state.ready[i] = False
+                break
+        del self.player_state[player_id]
+
+    def player_set_ready(self, player_id: str, room_id: str, ready: bool):
+        """玩家设置准备状态"""
+        room_state = self.room_state[room_id].data
+        for i in range(len(room_state.players)):
+            if room_state.players[i] == player_id:
+                room_state.ready[i] = ready
+                break
+
+    def player_start_game(self, room_id: str, game_id: str):
+        """玩家开始游戏"""
+        room_state = self.room_state[room_id].data
+        black_player_id = room_state.players[0]
+        white_player_id = room_state.players[1]
+        game = GameState(
+            id=game_id,
+            board=[[0 for _ in range(15)] for _ in range(15)],
+            black_player_id=black_player_id,
+            white_player_id=white_player_id,
+            current_turn="black",
+        )
+        self.game_state[game_id] = SubscribableGameState(game)
+        for player_id in room_state.players:
+            if player_id:
+                self.player_state[player_id].status = "in_game"
+        del self.room_state[room_id]
+
+    def player_delete_room(self, player_id: str, room_id: str):
+        """玩家删除房间"""
+        room_state = self.room_state[room_id].data
+        if room_state.host == player_id:
+            for pid in room_state.players:
+                if pid and pid in self.player_state:
+                    del self.player_state[pid]
+            del self.room_state[room_id]
+
+    def game_make_move(self, game_id: str, x: int, y: int) -> bool:
+        """玩家在游戏中落子"""
+        game_state = self.game_state[game_id].data
+        if game_state.board[y][x] != 0:
+            return False  # 位置已被占用
+        if game_state.current_turn == "black":
+            game_state.board[y][x] = 1
+            game_state.current_turn = "white"
+        else:
+            game_state.board[y][x] = 2
+            game_state.current_turn = "black"
+        return True
 
 
-server_state = ServerState(rooms={}, players={}, games={})
+# 全局单例
+server_state = ServerState()
+
+game_state_example = {
+    "player_state": [
+        {
+            "id": "player1",
+            "status": "in_room",
+            "room_id": "room1",
+        },
+        {
+            "id": "player2",
+            "status": "in_game",
+            "game_id": "game1",
+        },
+    ],
+    "room_state": [
+        {
+            "id": "room1",
+            "players": ["player1", "player2"],
+            "host": "player1",
+            "ready": [True, False],
+            "create_time": 1625247600,
+        },
+        {
+            "id": "room2",
+            "players": ["player3", None],
+            "host": "player3",
+            "ready": [False, False],
+            "create_time": 1625247700,
+        },
+    ],
+    "game_state": [
+        {
+            "id": "game1",
+            "board": [[0 for _ in range(15)] for _ in range(15)],
+            "black_player_id": "player2",
+            "white_player_id": "player4",
+            "stage": "black_turn",
+            "create_time": 1625247800,
+        }
+    ],
+}

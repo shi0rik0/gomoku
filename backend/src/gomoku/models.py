@@ -2,7 +2,7 @@
 from sqlalchemy import Boolean, Column, DateTime, Integer, MetaData, String, Table
 from sqlalchemy.sql import func
 
-from gomoku.not_null_column import NotNullColumn
+from backend.src.gomoku.utils.not_null_column import NotNullColumn
 
 # MetaData 對象是所有表定義的容器
 metadata = MetaData()
