@@ -30,18 +30,20 @@ export default function Home() {
     const token = getAccessToken()
     // 连接到SSE
     const eventSource = new EventSource(
-      `http://localhost:8000/lobby/events?token=${token}&room_id=${id}`,
+      `http://localhost:8000/sse/room/events?token=${token}&room_id=${id}`,
     )
     eventSource.onmessage = (event) => {
-      const { state } = JSON.parse(event.data)
-      const { players, host, ready } = state
-      setPlayers(
-        players.map((playerId: string, index: number) => ({
-          id: playerId,
-          isHost: playerId === host,
-          isReady: ready[index],
-        })),
-      )
+      const data = JSON.parse(event.data)
+      if (data.type === "update") {
+        const { players, host, ready } = data.new_state
+        setPlayers(
+          players.map((playerId: string, index: number) => ({
+            id: playerId,
+            isHost: playerId === host,
+            isReady: ready[playerId] || false,
+          })),
+        )
+      }
     }
     return () => {
       eventSource.close()
@@ -50,8 +52,7 @@ export default function Home() {
 
   async function handleReady() {
     // 发送准备请求
-    const response = await apiAuth.post("/lobby/set-ready", {
-      room_id: id,
+    const response = await apiAuth.post("/room/set-ready", {
       is_ready: true,
     })
     console.log("准备响应:", response.data)

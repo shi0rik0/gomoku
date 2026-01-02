@@ -16,6 +16,28 @@ export default function Home() {
     }
   }, [user, loading, router])
 
+  useEffect(() => {
+    if (!loading && user) {
+      const fetchPlayerState = async () => {
+        try {
+          const response = await apiAuth.post("/get-player-state")
+          const { player_state } = response.data
+          if (
+            player_state.status === "in_room" ||
+            player_state.status === "in_game"
+          ) {
+            if (player_state.room_id) {
+              router.push(`/room/${player_state.room_id}`)
+            }
+          }
+        } catch (error) {
+          console.error("Failed to get player state:", error)
+        }
+      }
+      fetchPlayerState()
+    }
+  }, [user, loading, router])
+
   if (loading) {
     return <div>加载中...</div>
   }
@@ -25,17 +47,24 @@ export default function Home() {
   }
 
   async function handleCreateRoom() {
-    const response = await apiAuth.post("/lobby/create-room")
+    const response = await apiAuth.post("/room/create-room")
     const { roomId } = response.data
     router.push(`/room/${roomId}`)
   }
 
-  function handleJoinRoom() {
+  async function handleJoinRoom() {
     if (inputRoomId.trim() === "") {
       alert("请输入有效的房间号")
       return
     }
-    router.push(`/room/${inputRoomId.trim()}`)
+    try {
+      await apiAuth.post("/room/join-room", { room_id: inputRoomId.trim() })
+      router.push(`/room/${inputRoomId.trim()}`)
+    } catch (error) {
+      console.error("Failed to join room:", error)
+      console.error("Error details:", error.response?.data)
+      alert("加入房间失败，请检查房间号是否正确")
+    }
   }
 
   function handleRandomMatch() {
