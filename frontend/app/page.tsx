@@ -4,10 +4,13 @@ import { useAuth } from "@/lib/hooks/auth"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { apiAuth } from "@/lib/axios"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card } from "@/components/ui/card"
 
 export default function Home() {
   const router = useRouter()
-  const { user, loading, getAccessToken } = useAuth()
+  const { user, loading } = useAuth()
   const [inputRoomId, setInputRoomId] = useState("")
 
   useEffect(() => {
@@ -62,7 +65,6 @@ export default function Home() {
       router.push(`/room/${inputRoomId.trim()}`)
     } catch (error) {
       console.error("Failed to join room:", error)
-      console.error("Error details:", error.response?.data)
       alert("加入房间失败，请检查房间号是否正确")
     }
   }
@@ -72,23 +74,30 @@ export default function Home() {
   }
 
   return (
-    <div>
-      <p>{getAccessToken()}</p>
-      <div>
-        <button onClick={handleCreateRoom}>创建房间</button>
-      </div>
-      <div>
-        <input
-          type="text"
-          placeholder="输入房间号加入房间"
-          value={inputRoomId}
-          onChange={(e) => setInputRoomId(e.target.value)}
-        />
-        <button onClick={handleJoinRoom}>加入房间</button>
-      </div>
-      <div>
-        <button onClick={handleRandomMatch}>随机匹配</button>
-      </div>
+    <div className="min-h-screen flex justify-center items-center">
+      <Card className="p-6 w-full max-w-md mx-auto">
+        <h2 className="text-xl font-bold mb-4">五子棋</h2>
+        <div className="space-y-4">
+          <Button onClick={handleCreateRoom} className="w-full">
+            创建房间
+          </Button>
+          <div className="space-y-2">
+            <Input
+              type="text"
+              placeholder="输入房间号加入房间"
+              value={inputRoomId}
+              onChange={(e) => setInputRoomId(e.target.value)}
+              className="w-full p-2 border rounded"
+            />
+            <Button onClick={handleJoinRoom} className="w-full">
+              加入房间
+            </Button>
+          </div>
+          <Button onClick={handleRandomMatch} className="w-full">
+            随机匹配
+          </Button>
+        </div>
+      </Card>
     </div>
   )
 }

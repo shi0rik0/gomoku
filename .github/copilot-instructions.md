@@ -1,132 +1,71 @@
 # Copilot Instructions for Gomoku Repository
 
-## Repository Summary
+## High Level Details
 
-This repository implements a Gomoku (五子棋) game application with a backend API and a frontend web interface. The backend provides user authentication and management services, while the frontend is a Next.js application for the game interface. Currently, the backend is fully implemented with user CRUD operations, JWT authentication, and database migrations, but the frontend is still in its initial Next.js template state.
+This repository implements a full-stack Gomoku (Five in a Row) game application. The backend provides RESTful APIs and Server-Sent Events (SSE) for real-time game updates, user authentication, and room management. The frontend is a web application for playing the game, joining rooms, and managing user sessions.
 
-## High-Level Repository Information
+The repository is medium-sized with approximately 20-30 files across backend and frontend. It uses a microservices-like architecture with separate backend (Python) and frontend (TypeScript/React) components.
 
-- **Size**: Small repository with ~200 lines of backend code and minimal frontend code.
-- **Type**: Full-stack web application.
-- **Languages**: Python 3.13+ (backend), TypeScript/JavaScript (frontend).
-- **Frameworks/Runtimes**:
-  - Backend: FastAPI with SQLAlchemy Core (async), Alembic for migrations, PostgreSQL database, JWT for authentication.
-  - Frontend: Next.js 16 with React 19, TypeScript, Tailwind CSS.
-  - Package Management: uv (backend), npm (frontend).
-- **Target Runtime**: Backend runs on Python 3.13+, frontend on Node.js.
+- **Languages**: Python 3.13+ (backend), TypeScript/JavaScript (frontend)
+- **Frameworks**: FastAPI (backend), Next.js 16 with React 19 (frontend)
+- **Databases**: PostgreSQL with SQLAlchemy ORM and Alembic migrations
+- **Other Tools**: Uvicorn for ASGI server, Tailwind CSS for styling, ESLint for linting, Prettier for formatting
 
 ## Build Instructions
 
-### Backend Setup and Build
+### Environment Setup
 
-1. **Environment Setup**: Copy `backend/.env.example` to `backend/.env` and fill in the database credentials. The application uses PostgreSQL.
-2. **Install Dependencies**: Run `cd backend && uv sync` to install Python dependencies using uv.
-3. **Database Migration**: Run `cd backend && uv run alembic upgrade head` to apply database migrations.
-4. **Run Server**: Execute `cd backend && uv run uvicorn src.main:app --host 0.0.0.0 --port 8000` to start the FastAPI server.
-   - The server will be available at http://localhost:8000
-   - API documentation at http://localhost:8000/docs
-5. **Validation**: The server should start without errors if database connection is successful. Test with `curl http://localhost:8000/` which should return a welcome message.
+- **Python**: Requires Python 3.13+. Uses `uv` for dependency management. A `.python-version` file indicates pyenv usage.
+- **Node.js**: Requires Node.js (version not specified, but Next.js 16 suggests Node 18+). Uses npm for package management.
+- **Database**: Requires PostgreSQL. Environment variables in `.env` file for DB connection.
 
-**Notes**:
+Always set up the database before running the backend. Copy `.env.example` to `.env` and fill in DB credentials.
 
-- Always run `uv sync` after modifying `pyproject.toml`.
-- Database must be accessible; if connection fails, check `.env` values.
-- No tests are currently implemented in the backend.
-- Build time: < 1 minute for dependencies, < 10 seconds for server start.
+### Frontend
 
-### Frontend Setup and Build
+1. **Bootstrap**: `cd frontend && npm install` - Installs dependencies. Takes ~1-2 minutes.
+2. **Lint**: `cd frontend && npm run lint` - Runs ESLint. No errors expected if code follows standards.
+3. **Build**: `cd frontend && npm run build` - Builds the Next.js app for production. Takes ~30-60 seconds.
+4. **Run Dev**: `cd frontend && npm run dev` - Starts dev server on http://localhost:3000. Auto-reloads on changes.
+5. **Run Prod**: `cd frontend && npm run start` - Starts production server after build.
 
-1. **Install Dependencies**: Run `cd frontend && npm install` to install Node.js dependencies.
-2. **Run Development Server**: Execute `cd frontend && npm run dev` to start the Next.js development server.
-   - The app will be available at http://localhost:3000
-3. **Build for Production**: Run `cd frontend && npm run build` to create a production build.
-4. **Start Production Server**: After building, run `cd frontend && npm run start` to start the production server.
-5. **Lint**: Run `cd frontend && npm run lint` to check code style with ESLint.
+Validated: npm install works, lint passes on clean code, build succeeds, dev server starts successfully.
 
-**Notes**:
+### Backend
 
-- Always run `npm install` after modifying `package.json`.
-- Development server supports hot reloading.
-- Build time: < 1 minute for dependencies, < 30 seconds for build.
-- No tests are currently implemented in the frontend.
+1. **Bootstrap**: `cd backend && uv sync` - Installs Python dependencies. Takes ~1-2 minutes.
+2. **Migrations**: `cd backend && uv run alembic upgrade head` - Applies DB migrations. Requires DB connection.
+3. **Run Dev**: `cd backend && python scripts/run_dev.py` - Starts dev server with auto-reload on http://0.0.0.0:8000. Checks migrations first.
+4. **Run Prod**: `cd backend && python scripts/run_prod.py` - Starts production server without reload.
 
-### Testing
+Validated: uv sync works, migrations apply if DB is set up, dev server starts but requires DB for full functionality. No linting configured for Python.
 
-- No automated tests are currently implemented in either backend or frontend.
-- Manual testing: Use the API endpoints via Swagger UI at `/docs` or curl commands.
+### Full Stack
 
-### Validation Steps
+- Always run backend first, then frontend.
+- Backend needs DB; frontend proxies to backend via axios (configured in lib/axios.ts).
+- No tests present; no CI pipelines configured.
 
-- Backend: Check that `uv run uvicorn src.main:app` starts without import errors.
-- Frontend: Verify that `npm run dev` starts the server and the page loads at localhost:3000.
-- Database: Ensure PostgreSQL is running and credentials in `.env` are correct.
-- Always verify database connectivity before running the backend.
+Making changes: After code edits, run lint/build for respective parts. For DB schema changes, update models.py, run `uv run alembic revision --autogenerate -m "message"`, then `uv run alembic upgrade head`.
 
-## Project Layout and Architecture
+## Project Layout
 
-### Major Architectural Elements
+### Architecture
 
-- **Backend (`backend/`)**: FastAPI application with SQLAlchemy Core for database operations.
-  - `src/main.py`: Main FastAPI app with user CRUD endpoints.
-  - `src/models.py`: SQLAlchemy table definitions.
-  - `src/database.py`: Database connection and lifecycle management.
-  - `src/jwt.py`: JWT token creation and validation.
-  - `src/schemas.py`: Pydantic models for API requests/responses.
-  - `alembic/`: Database migration scripts.
-- **Frontend (`frontend/`)**: Next.js application (currently default template).
-  - `app/page.tsx`: Main page component.
-  - `lib/axios.ts`: Axios configuration for API calls.
-- **Configuration Files**:
-  - Backend: `pyproject.toml` (dependencies), `alembic.ini` (migration config), `.env` (environment variables).
-  - Frontend: `package.json` (dependencies), `next.config.ts`, `tsconfig.json`, `eslint.config.mjs`.
+- **Backend** (`backend/`): FastAPI app in `src/gomoku/`. Main entry: `main.py`. APIs in `api/`, DB models in `sql/models.py`, state management in `state/`.
+- **Frontend** (`app/`): Next.js pages in `app/`. Lobby, login, room pages. Hooks in `lib/hooks/`.
+- **Config Files**: `backend/pyproject.toml` (deps), `frontend/package.json` (deps/scripts), `alembic.ini` (migrations), `tsconfig.json` (TypeScript).
+- **Scripts**: `backend/scripts/run_dev.py` (checks migrations, starts uvicorn), `run_prod.py` (starts uvicorn).
 
-### Checks and Validation Pipelines
+### Validation
 
-- No GitHub Actions or CI pipelines are currently configured.
-- Pre-commit checks: ESLint for frontend code style.
-- Manual validation: Test API endpoints and frontend functionality.
+- No CI workflows yet. Manual validation: run lint, build, start servers, test game flow.
+- Dependencies: PostgreSQL, Node.js, Python 3.13+, uv tool.
 
-### Dependencies
+### Key Files
 
-- Backend requires PostgreSQL database (remote or local).
-- Environment variables must be set in `.env` for database connection and JWT secret.
-- Python 3.13+ required (specified in `pyproject.toml`).
+- Root: LICENSE, .github/ (for this file), .vscode/ (editor config).
+- Backend: pyproject.toml, alembic.ini, src/gomoku/main.py (FastAPI app), sql/models.py (DB models), api/auth.py (JWT auth), api/room.py (room management), sse/game.py (game events).
+- Frontend: package.json, app/layout.tsx (root layout), app/page.tsx (home), lobby/page.tsx, room/[id]/page.tsx (game room), lib/axios.ts (API client).
 
-### Repository Structure Details
-
-**Root Directory Files**:
-
-- `LICENSE`: MIT license file.
-- `.git/`: Git repository.
-- `.vscode/`: VS Code workspace settings.
-- `backend/`: Backend Python application.
-- `frontend/`: Frontend Next.js application.
-
-**Backend Key Files**:
-
-- `pyproject.toml`: Project metadata and dependencies (FastAPI, SQLAlchemy, etc.).
-- `.env.example`: Template for environment variables.
-- `src/main.py` (excerpt):
-
-  ```python
-  from fastapi import FastAPI
-  from database import init_db, shutdown_db
-  from models import metadata
-
-  app = FastAPI(title="FastAPI SQLAlchemy Core Async Demo")
-
-  @app.on_event("startup")
-  async def startup_event():
-      await init_db(metadata)
-
-  @app.on_event("shutdown")
-  async def shutdown_event():
-      await shutdown_db()
-  ```
-
-**Frontend Key Files**:
-
-- `package.json`: Dependencies (Next.js, React, Tailwind, etc.).
-- `app/page.tsx`: Default Next.js home page.
-
-Trust these instructions and only search for additional information if something is incomplete or incorrect. This will help you work efficiently on this repository.
+Trust these instructions; they are validated. Only search if issues arise.

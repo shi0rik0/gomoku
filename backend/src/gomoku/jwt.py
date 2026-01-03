@@ -10,7 +10,6 @@ from jose import ExpiredSignatureError, JWTError, jwt
 from gomoku.env import JWT_EXPIRE_MINUTES, JWT_SECRET
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 SECRET_KEY = JWT_SECRET
 ALGORITHM = "HS256"
@@ -42,6 +41,7 @@ def verify_token(token: str) -> str | None:
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> str:
+    """从 Authorization header 验证 JWT Token"""
     token = credentials.credentials
     user_id = verify_token(token)
     if user_id is None:
@@ -57,12 +57,12 @@ async def get_current_user(
 token_query = APIKeyQuery(name="token", auto_error=True)
 
 
-async def get_current_player_from_query(token: str = Security(token_query)) -> str:
-    """从 query 参数验证 JWT Token"""
-    player_id = verify_token(token)
-    logger.info(f"Verifying token from query: {token}, player_id: {player_id}")
-    if player_id is None:
+async def get_current_user_from_query(token: str = Security(token_query)) -> str:
+    """从 query 参数 `token` 验证 JWT Token"""
+    user_id = verify_token(token)
+    logger.info(f"Verifying token from query: {token}, user_id: {user_id}")
+    if user_id is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
         )
-    return player_id
+    return user_id

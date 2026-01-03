@@ -6,6 +6,9 @@ import { useParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { apiAuth } from "@/lib/axios"
 
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+
 export default function Home() {
   const { id } = useParams()
   const router = useRouter()
@@ -25,6 +28,7 @@ export default function Home() {
   ])
 
   const isHost = user?.id === players.find((p) => p.isHost)?.id
+  const isReady = players.find((p) => p.id === user?.id)?.isReady
 
   useEffect(() => {
     const token = getAccessToken()
@@ -43,6 +47,15 @@ export default function Home() {
             isReady: ready[playerId] || false,
           })),
         )
+      } else if (data.type === "initial") {
+        const { players, host, ready } = data.state
+        setPlayers(
+          players.map((playerId: string, index: number) => ({
+            id: playerId,
+            isHost: playerId === host,
+            isReady: ready[playerId] || false,
+          })),
+        )
       }
     }
     return () => {
@@ -53,7 +66,7 @@ export default function Home() {
   async function handleReady() {
     // 发送准备请求
     const response = await apiAuth.post("/room/set-ready", {
-      is_ready: true,
+      is_ready: !isReady,
     })
     console.log("准备响应:", response.data)
   }
@@ -64,20 +77,34 @@ export default function Home() {
   }
 
   return (
-    <div>
-      {players.map((player) => (
-        <div key={player.id}>
-          <span>{player.id}</span>
-          {player.isHost && <span> (房主) </span>}
-          <span> - </span>
-          <span>{player.isReady ? "已准备" : "未准备"}</span>
+    <div className="min-h-screen flex justify-center items-center">
+      <Card className="p-6 w-full max-w-md mx-auto">
+        <h2 className="text-xl font-bold mb-4">房间 {id}</h2>
+        <div className="space-y-2 mb-4">
+          {players.map((player) => (
+            <div
+              key={player.id}
+              className="flex justify-between items-center p-2 border rounded"
+            >
+              <span>{player.id}</span>
+              {player.isHost && (
+                <span className="text-sm text-gray-500">(房主)</span>
+              )}
+              <span
+                className={player.isReady ? "text-green-500" : "text-red-500"}
+              >
+                {player.isReady ? "已准备" : "未准备"}
+              </span>
+            </div>
+          ))}
         </div>
-      ))}
-      <div>
-        <button onClick={isHost ? handleStartGame : handleReady}>
-          {isHost ? "开始游戏" : "准备"}
-        </button>
-      </div>
+        <Button
+          onClick={isHost ? handleStartGame : handleReady}
+          className="w-full"
+        >
+          {isHost ? "开始游戏" : isReady ? "取消准备" : "准备"}
+        </Button>
+      </Card>
     </div>
   )
 }
